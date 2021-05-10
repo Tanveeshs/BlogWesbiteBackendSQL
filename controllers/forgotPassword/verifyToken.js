@@ -1,0 +1,40 @@
+const crypto = require('crypto');
+const comFun = require('../../commonFunctions')
+const db = require('../../config/database');
+
+module.exports.verifyToken = (req, res, next)=> {
+    if(!comFun.strVal(req.body.otp)){
+        res.json({success:0,message:"Sorry there is some error!"})
+        return next()
+    }else if(!comFun.strVal(req.body.email)){
+        res.json({success:0,message:"Sorry there is some error!"})
+        return next()
+    }
+    else {
+        let otp = req.body.otp;
+        let email = req.body.email.toLowerCase();
+        let time = comFun.getCurrTime();
+        let query = `SELECT * FROM forgot_pass WHERE email='${email}' AND otp=${otp} AND expiry>'${time}'`
+        db.query(query,function(err,doc){
+            if(err){
+                res.json({success:0,message:"Sorry there is some error!"})
+                return next()
+            }else if(doc.rowCount>0) {
+                try {
+                    let cipher = crypto.createCipher('aes256',"Secret");
+                    let encrypted = cipher.update(String(doc.userId), 'utf8', 'hex') + cipher.final('hex');
+                    res.json({success:1,message:"OTP Verified!",token:encrypted});
+                    return next();
+                } catch (e) {
+                    console.error("Wrong Token Error")
+                    res.json({success:0,message:"Error"})
+                    return next()
+                }
+            }else {
+                console.log(doc);
+                res.json({success:-10,message:"Wrong or Expired OTP"})
+                return next();
+            }
+        })
+    }
+}
